@@ -1,0 +1,179 @@
+{
+  "name": "java-navigator-plus",
+  "displayName": "Java Navigator Plus",
+  "description": "融合Java接口实现跳转与MyBatis Mapper XML导航的统一Java导航插件",
+  "version": "1.0.0",
+  "publisher": "your-publisher",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-username/java-navigator-plus"
+  },
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Debuggers",
+    "Other"
+  ],
+  "keywords": [
+    "java",
+    "mybatis",
+    "mapper",
+    "navigation",
+    "interface",
+    "implementation"
+  ],
+  "activationEvents": [
+    "onLanguage:java",
+    "onLanguage:xml",
+    "workspaceContains:**/*.java",
+    "workspaceContains:**/*.xml"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "javaNavigator.jumpToImplementation",
+        "title": "跳转到实现",
+        "category": "Java Navigator"
+      },
+      {
+        "command": "javaNavigator.jumpToInterface",
+        "title": "跳转到接口",
+        "category": "Java Navigator"
+      },
+      {
+        "command": "javaNavigator.jumpToXml",
+        "title": "跳转到XML",
+        "category": "Java Navigator"
+      },
+      {
+        "command": "javaNavigator.jumpToMapper",
+        "title": "跳转到Mapper",
+        "category": "Java Navigator"
+      },
+      {
+        "command": "javaNavigator.showNavigationGraph",
+        "title": "显示导航图谱",
+        "category": "Java Navigator"
+      },
+      {
+        "command": "javaNavigator.refreshIndex",
+        "title": "刷新索引",
+        "category": "Java Navigator"
+      },
+      {
+        "command": "javaNavigator.diagnose",
+        "title": "诊断",
+        "category": "Java Navigator"
+      },
+      {
+        "command": "javaNavigator.jumpToInterfaceFromClass",
+        "title": "跳转到接口（类级别）",
+        "category": "Java Navigator"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "javaNavigator.jumpToImplementation",
+        "key": "ctrl+alt+b",
+        "mac": "cmd+alt+b",
+        "when": "editorTextFocus && editorLangId == java"
+      },
+      {
+        "command": "javaNavigator.jumpToXml",
+        "key": "ctrl+alt+m",
+        "mac": "cmd+alt+m",
+        "when": "editorTextFocus && editorLangId == java"
+      },
+      {
+        "command": "javaNavigator.jumpToMapper",
+        "key": "ctrl+alt+u",
+        "mac": "cmd+alt+u",
+        "when": "editorTextFocus && editorLangId == xml"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "javaNavigator.jumpToImplementation",
+          "when": "editorHasDefinitionProvider && editorTextFocus && editorLangId == java",
+          "group": "navigation@1"
+        },
+        {
+          "command": "javaNavigator.jumpToXml",
+          "when": "editorTextFocus && editorLangId == java",
+          "group": "navigation@2"
+        },
+        {
+          "command": "javaNavigator.jumpToMapper",
+          "when": "editorTextFocus && editorLangId == xml",
+          "group": "navigation@1"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Java Navigator Plus",
+      "properties": {
+        "javaNavigator.enableCodeLens": {
+          "type": "boolean",
+          "default": true,
+          "description": "启用CodeLens内联按钮"
+        },
+        "javaNavigator.enableInterfaceNavigation": {
+          "type": "boolean",
+          "default": true,
+          "description": "启用接口实现类导航"
+        },
+        "javaNavigator.enableMyBatisNavigation": {
+          "type": "boolean",
+          "default": true,
+          "description": "启用MyBatis Mapper导航"
+        },
+        "javaNavigator.mapperPatterns": {
+          "type": "array",
+          "default": [
+            {
+              "javaSuffix": "Mapper",
+              "xmlSuffix": "Mapper",
+              "searchPaths": ["src/main/resources/mapper", "src/main/resources/mappers", "src/main/resources/xml"]
+            }
+          ],
+          "description": "Mapper文件命名匹配规则"
+        },
+        "javaNavigator.excludeFolders": {
+          "type": "array",
+          "default": ["node_modules", ".git", "target", "build", "out", "dist"],
+          "description": "排除的文件夹"
+        },
+        "javaNavigator.cacheEnabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "启用索引缓存"
+        },
+        "javaNavigator.useJavaLanguageServer": {
+          "type": "boolean",
+          "default": true,
+          "description": "优先使用Java语言服务(Red Hat Java扩展)"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0",
+    "@types/node": "16.x",
+    "@typescript-eslint/eslint-plugin": "^5.45.0",
+    "@typescript-eslint/parser": "^5.45.0",
+    "eslint": "^8.28.0",
+    "typescript": "^4.9.4"
+  }
+}
