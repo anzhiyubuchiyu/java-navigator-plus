@@ -6,7 +6,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs/promises';
 import { IndexCacheManager } from '../cache/indexCache';
-import { JavaParser } from '../utils/javaParser';
+import { JavaParser, JavaLanguageService } from '../utils';
 import { XmlParser } from '../utils/xmlParser';
 import { Logger } from '../utils/logger';
 import { MyBatisNavigator } from '../navigators/myBatisNavigator';
@@ -16,15 +16,61 @@ export class UnifiedCodeLensProvider implements vscode.CodeLensProvider {
   private xmlParser: XmlParser;
   private logger: Logger;
   private myBatisNavigator: MyBatisNavigator;
+  private javaLanguageService: JavaLanguageService;
 
   private _onDidChangeCodeLenses: vscode.EventEmitter<void> = new vscode.EventEmitter<void>();
   public readonly onDidChangeCodeLenses: vscode.Event<void> = this._onDidChangeCodeLenses.event;
+
+  /**
+   * 系统/框架内置接口列表
+   * 这些接口不会显示"跳转到接口"按钮
+   */
+  private readonly SYSTEM_INTERFACES = new Set([
+    // Java 核心接口
+    'Serializable', 'Comparable', 'Cloneable', 'Runnable', 'Callable',
+    'Iterable', 'Iterator', 'Collection', 'List', 'Set', 'Map', 'Queue',
+    'Enumeration', 'Observer', 'AutoCloseable', 'Closeable', 'Flushable',
+    'Readable', 'Appendable', 'CharSequence', 'Externalizable',
+    // Java 8+ 函数式接口
+    'Supplier', 'Consumer', 'Predicate', 'Function', 'BiFunction',
+    'UnaryOperator', 'BinaryOperator', 'BiConsumer', 'BiPredicate',
+    // Spring 框架接口
+    'ApplicationContextAware', 'BeanFactoryAware', 'BeanNameAware',
+    'InitializingBean', 'DisposableBean', 'FactoryBean', 'SmartFactoryBean',
+    'BeanPostProcessor', 'BeanFactoryPostProcessor', 'EnvironmentAware',
+    'ResourceLoaderAware', 'MessageSourceAware', 'ApplicationEventPublisherAware',
+    'ServletContextAware', 'ServletConfigAware', 'LoadTimeWeaverAware',
+    'ImportAware', 'Aware', 'Ordered', 'PriorityOrdered',
+    // MyBatis 接口
+    'Interceptor', 'TypeHandler', 'ResultHandler', 'RowBounds',
+    // 其他常见框架接口
+    'HttpServletRequest', 'HttpServletResponse', 'ServletRequest', 'ServletResponse',
+    'Filter', 'Servlet', 'Listener', 'SessionAware', 'RequestAware',
+    'Principal', 'GrantedAuthority', 'UserDetails', 'Authentication',
+    // JPA/Hibernate
+    'EntityListener', 'AttributeConverter', 'Specification',
+    // 通用标记接口
+    'Marker', 'Tag', 'TagSupport', 'BodyTag', 'SimpleTag',
+    // 序列化相关
+    'ObjectInputValidation', 'ObjectInputFilter',
+    // 并发相关
+    'Future', 'Delayed', 'TransferQueue', 'BlockingQueue', 'BlockingDeque',
+    // 反射相关
+    'AnnotatedElement', 'GenericDeclaration', 'Type', 'TypeVariable',
+    // 网络相关
+    'SerializablePermission', 'SocketOptions', 'FileNameMap',
+    // 工具接口
+    'Comparator', 'Formattable', 'RandomAccess', 'NavigableMap', 'NavigableSet',
+    'SortedMap', 'SortedSet', 'Deque', 'ListIterator', 'Spliterator',
+    'PrimitiveIterator', 'OfInt', 'OfLong', 'OfDouble'
+  ]);
 
   constructor() {
     this.cache = IndexCacheManager.getInstance();
     this.xmlParser = XmlParser.getInstance();
     this.logger = Logger.getInstance();
     this.myBatisNavigator = MyBatisNavigator.getInstance();
+    this.javaLanguageService = JavaLanguageService.getInstance();
   }
 
   refresh(): void {
@@ -74,6 +120,21 @@ export class UnifiedCodeLensProvider implements vscode.CodeLensProvider {
       s.kind === vscode.SymbolKind.Class
     );
 
+    // 尝试使用 Java 语言服务获取更准确的接口信息
+    let userInterfaces: string[] = [];
+    if (enableInterfaceNav && !javaInfo.isInterface && !javaInfo.isAbstract && !javaInfo.isMapper) {
+      // 优先使用 Java 语言服务
+      const typeDetails = await this.javaLanguageService.getTypeDetails(document.uri);
+      if (typeDetails && typeDetails.interfaces.length > 0) {
+        userInterfaces = typeDetails.interfaces;
+        this.logger.debug(`[CodeLens] Using Java language service for interfaces:`, userInterfaces);
+      } else {
+        // 回退到文本解析
+        const realInterfaces = javaInfo.interfaces.filter(i => !i.startsWith('__extends:'));
+        userInterfaces = this.filterSystemInterfaces(realInterfaces);
+      }
+    }
+
     // 类级别的CodeLens
     if (classSymbol) {
       const classLine = (classSymbol.selectionRange || classSymbol.range).start.line;
@@ -106,16 +167,13 @@ export class UnifiedCodeLensProvider implements vscode.CodeLensProvider {
       }
 
       // 实现类：跳转到接口
-      if (enableInterfaceNav && !javaInfo.isInterface && !javaInfo.isAbstract && !javaInfo.isMapper && javaInfo.interfaces.length > 0) {
-        const realInterfaces = javaInfo.interfaces.filter(i => !i.startsWith('__extends:'));
-        if (realInterfaces.length > 0) {
-          codeLenses.push(this.createCodeLens(
-            classLine,
-            `$(symbol-interface) 跳转到接口`,
-            'javaNavigator.jumpToInterfaceFromClass',
-            [filePath, javaInfo.className]
-          ));
-        }
+      if (enableInterfaceNav && !javaInfo.isInterface && !javaInfo.isAbstract && !javaInfo.isMapper && userInterfaces.length > 0) {
+        codeLenses.push(this.createCodeLens(
+          classLine,
+          `$(symbol-interface) 跳转到接口`,
+          'javaNavigator.jumpToInterfaceFromClass',
+          [filePath, javaInfo.className]
+        ));
       }
     }
 
@@ -136,8 +194,8 @@ export class UnifiedCodeLensProvider implements vscode.CodeLensProvider {
           ));
         }
 
-        // 实现类方法：跳转到接口
-        if (enableInterfaceNav && !javaInfo.isInterface && !javaInfo.isMapper && javaInfo.interfaces.length > 0) {
+        // 实现类方法：跳转到接口（只考虑用户自定义接口）
+        if (enableInterfaceNav && !javaInfo.isInterface && !javaInfo.isMapper && userInterfaces.length > 0) {
           codeLenses.push(this.createCodeLens(
             method.line,
             `$(arrow-left) 跳转到接口`,
@@ -263,6 +321,15 @@ export class UnifiedCodeLensProvider implements vscode.CodeLensProvider {
     if (!detail) return '';
     const match = detail.match(/\(([^)]*)\)/);
     return match ? match[1] : '';
+  }
+
+  /**
+   * 过滤系统/框架内置接口
+   * @param interfaces 接口名称列表
+   * @returns 用户自定义接口列表
+   */
+  private filterSystemInterfaces(interfaces: string[]): string[] {
+    return interfaces.filter(name => !this.SYSTEM_INTERFACES.has(name));
   }
 
   private cacheHasSqlForMethod(namespace: string, methodName: string): boolean {

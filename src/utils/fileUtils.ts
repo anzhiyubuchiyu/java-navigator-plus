@@ -55,7 +55,14 @@ export async function fileExists(filePath: string): Promise<boolean> {
  */
 export function getExcludePattern(): string {
   const config = vscode.workspace.getConfiguration('javaNavigator');
-  const excludeFolders = config.get<string[]>('excludeFolders', ['node_modules', '.git', 'target', 'build', 'out', 'dist']);
+  const excludeFolders = config.get<string[]>('excludeFolders', [
+    'node_modules', '.git', '.svn', '.hg',
+    'target', 'build', 'out', 'dist',
+    '.idea', '.vscode', '.settings',
+    'bin', 'obj', 'coverage', '.nyc_output',
+    '.gradle', 'gradle', '.mvn',
+    'mvnw', 'mvnw.cmd', 'gradlew', 'gradlew.bat'
+  ]);
   if (excludeFolders.length === 0) return '';
   if (excludeFolders.length === 1) return `**/${excludeFolders[0]}/**`;
   return `{${excludeFolders.map(f => `**/${f}/**`).join(',')}}`;
@@ -67,15 +74,23 @@ export function getExcludePattern(): string {
 export function shouldIgnoreFile(filePath: string): boolean {
   const ignorePatterns = [
     '/node_modules/',
-    '/.git/',
-    '\\.git\\',
-    '/target/',
-    '/build/',
-    '/out/',
-    '/dist/',
-    '.tmp',
-    '.temp',
-    '~'
+    '/.git/', '\\.git\\',
+    '/.svn/', '\\.svn\\',
+    '/.hg/', '\\.hg\\',
+    '/target/', '\\target\\',
+    '/build/', '\\build\\',
+    '/out/', '\\out\\',
+    '/dist/', '\\dist\\',
+    '/.idea/', '\\.idea\\',
+    '/.vscode/', '\\.vscode\\',
+    '/.settings/', '\\.settings\\',
+    '/bin/', '\\bin\\',
+    '/obj/', '\\obj\\',
+    '/coverage/', '\\coverage\\',
+    '/.nyc_output/', '\\.nyc_output\\',
+    '/.gradle/', '\\.gradle\\',
+    '/gradle/', '\\gradle\\',
+    '.tmp', '.temp', '~'
   ];
 
   return ignorePatterns.some(pattern => filePath.includes(pattern));

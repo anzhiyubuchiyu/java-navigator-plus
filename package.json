@@ -2,7 +2,7 @@
   "name": "java-navigator-plus",
   "displayName": "Java Navigator Plus",
   "description": "融合Java接口实现跳转与MyBatis Mapper XML导航的统一Java导航插件",
-  "version": "1.0.0",
+  "version": "1.0.3",
   "publisher": "anzhiyubuchiyu",
   "repository": {
     "type": "git",
@@ -144,8 +144,8 @@
         },
         "javaNavigator.excludeFolders": {
           "type": "array",
-          "default": ["node_modules", ".git", "target", "build", "out", "dist"],
-          "description": "排除的文件夹"
+          "default": ["node_modules", ".git", ".svn", ".hg", "target", "build", "out", "dist", ".idea", ".vscode", ".settings", "bin", "obj", "coverage", ".nyc_output", ".gradle", "gradle", ".mvn", "mvnw", "mvnw.cmd", "gradlew", "gradlew.bat"],
+          "description": "扫描时排除的文件夹"
         },
         "javaNavigator.cacheEnabled": {
           "type": "boolean",
