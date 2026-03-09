@@ -18,7 +18,7 @@ export class Logger {
   private logLevel: LogLevel = LogLevel.Info;
 
   private constructor() {
-    this.outputChannel = vscode.window.createOutputChannel('Java Navigator Plus');
+    this.outputChannel = vscode.window.createOutputChannel('Java Jump');
   }
 
   static getInstance(): Logger {

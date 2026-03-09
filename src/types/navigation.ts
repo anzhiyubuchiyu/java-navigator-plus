@@ -1,7 +1,7 @@
 /**
  * 统一导航类型定义
  *
- * 定义 Java Navigator Plus 插件中所有导航相关的类型
+ * 定义 Java Jump 插件中所有导航相关的类型
  *
  * 跳转场景分类：
  * - A 模块：接口与实现类导航 (Interface ↔ Implementation)

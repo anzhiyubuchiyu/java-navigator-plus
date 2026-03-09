@@ -1,5 +1,5 @@
 /**
- * Java Navigator Plus - 扩展入口
+ * Java Jump - 扩展入口
  *
  * 融合功能：
  * 1. Java接口实现跳转
@@ -38,7 +38,7 @@ const DEBOUNCE_DELAY = 300;
  */
 export function activate(context: vscode.ExtensionContext) {
   logger = Logger.getInstance();
-  logger.info('Java Navigator Plus 扩展已激活');
+  logger.info('Java Jump 扩展已激活');
 
   cache = IndexCacheManager.getInstance();
   xmlParser = XmlParser.getInstance();
@@ -67,7 +67,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   initializeProjectScan();
 
-  logger.info('Java Navigator Plus 初始化完成');
+  logger.info('Java Jump 初始化完成');
 }
 
 /**
@@ -448,5 +448,5 @@ export function deactivate() {
   debounceTimers.clear();
 
   cache.clearAll();
-  logger.info('Java Navigator Plus 扩展已停用');
+  logger.info('Java Jump 扩展已停用');
 }

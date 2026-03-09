@@ -6,6 +6,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import { JavaParseResult, JavaMethod } from '../types';
+import { JavaLanguageService } from './javaLanguageService';
 
 // Java关键字集合
 const JAVA_KEYWORDS = new Set([
@@ -191,17 +192,23 @@ export class JavaParser {
   }
 
   /**
-   * 提取实现的接口列表
+   * 提取实现的接口列表（同步版本，不过滤系统接口）
+   * 用于只需要原始列表的场景
    */
   static extractImplementedInterfaces(content: string): string[] {
     const interfaces: string[] = [];
 
-    // 提取类声明 - 改进正则表达式
+    // 提取类声明 - 改进正则表达式，支持多行
     // 匹配示例: class UserServiceImpl implements UserService
     // 匹配示例: class UserServiceImpl extends BaseService implements UserService, OtherService
     // 匹配示例: class UserServiceImpl<T> implements Service<T>
-    const declMatch = content.match(/\bclass\s+([\w<>,\s]+?)(?:\s+extends\s+([\w<>,.?\s]+?))?(?:\s+implements\s+([^{]+))?\s*\{/);
-    if (!declMatch) return [];
+    // 使用[\s\S]代替.来匹配包括换行符在内的所有字符
+    const declMatch = content.match(/\bclass\s+([\w<>,\s]+?)(?:\s+extends\s+([\w<>,.?\s]+?))?(?:\s+implements\s+([^{\n;]+))?\s*\{/);
+    if (!declMatch) {
+      console.log('[JavaParser] 未匹配到类声明');
+      return [];
+    }
+    console.log(`[JavaParser] 类声明匹配结果: extends=${declMatch[2]}, implements=${declMatch[3]}`);
 
     // 解析implements子句 (declMatch[3])
     if (declMatch[3]) {
@@ -215,7 +222,7 @@ export class JavaParser {
         name = name.replace(/\s+/g, '');
         return name;
       }).filter(s => s.length > 0);
-      
+
       implList.forEach(name => {
         if (name && name !== 'Object') {
           interfaces.push(name);
@@ -232,6 +239,49 @@ export class JavaParser {
     }
 
     return interfaces.filter(i => i !== '');
+  }
+
+  /**
+   * 提取实现的接口列表（异步版本，过滤系统接口）
+   * 使用Red Hat Java扩展获取全限定名进行判断
+   * @param content 文件内容
+   * @param fileUri 文件URI
+   */
+  static async extractImplementedInterfacesAsync(
+    content: string,
+    fileUri: vscode.Uri
+  ): Promise<string[]> {
+    const allInterfaces = this.extractImplementedInterfaces(content);
+    const javaService = JavaLanguageService.getInstance();
+    const filtered: string[] = [];
+
+    console.log(`[JavaParser] 提取到接口: ${allInterfaces.join(', ')}`);
+
+    for (const iface of allInterfaces) {
+      // 跳过extends标记
+      if (iface.startsWith('__extends:')) {
+        filtered.push(iface);
+        continue;
+      }
+
+      const isSystem = await javaService.isSystemInterfaceWithContext(iface, fileUri, content);
+      console.log(`[JavaParser] ${iface} 是系统接口: ${isSystem}`);
+      if (!isSystem) {
+        filtered.push(iface);
+      }
+    }
+
+    console.log(`[JavaParser] 过滤后接口: ${filtered.join(', ')}`);
+    return filtered;
+  }
+
+  /**
+   * 检查是否是系统接口（同步版本，仅支持全限定名）
+   * @param interfaceName 接口名称（全限定名）
+   */
+  static isSystemInterface(interfaceName: string): boolean {
+    const javaService = JavaLanguageService.getInstance();
+    return javaService.isSystemInterface(interfaceName);
   }
 
   /**

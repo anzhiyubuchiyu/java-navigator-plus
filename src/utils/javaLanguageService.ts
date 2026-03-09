@@ -231,39 +231,110 @@ export class JavaLanguageService {
 
   /**
    * 检查是否是系统接口
+   * 基于包名判断：java.*, javax.*, jakarta.*, org.springframework.* 等视为系统接口
+   * @param interfaceName 接口名（可以是简单名或全限定名）
    */
-  private isSystemInterface(interfaceName: string): boolean {
-    const systemInterfaces = new Set([
-      'Serializable', 'Comparable', 'Cloneable', 'Runnable', 'Callable',
-      'Iterable', 'Iterator', 'Collection', 'List', 'Set', 'Map', 'Queue',
-      'Enumeration', 'Observer', 'AutoCloseable', 'Closeable', 'Flushable',
-      'Readable', 'Appendable', 'CharSequence', 'Externalizable',
-      'Supplier', 'Consumer', 'Predicate', 'Function', 'BiFunction',
-      'UnaryOperator', 'BinaryOperator', 'BiConsumer', 'BiPredicate',
-      'ApplicationContextAware', 'BeanFactoryAware', 'BeanNameAware',
-      'InitializingBean', 'DisposableBean', 'FactoryBean',
-      'BeanPostProcessor', 'BeanFactoryPostProcessor', 'EnvironmentAware',
-      'ResourceLoaderAware', 'MessageSourceAware', 'ApplicationEventPublisherAware',
-      'ServletContextAware', 'ServletConfigAware', 'LoadTimeWeaverAware',
-      'ImportAware', 'Aware', 'Ordered', 'PriorityOrdered',
-      'Interceptor', 'TypeHandler', 'ResultHandler', 'RowBounds',
-      'HttpServletRequest', 'HttpServletResponse', 'ServletRequest', 'ServletResponse',
-      'Filter', 'Servlet', 'Listener', 'SessionAware', 'RequestAware',
-      'Principal', 'GrantedAuthority', 'UserDetails', 'Authentication',
-      'EntityListener', 'AttributeConverter', 'Specification',
-      'Marker', 'Tag', 'TagSupport', 'BodyTag', 'SimpleTag',
-      'ObjectInputValidation', 'ObjectInputFilter',
-      'Future', 'Delayed', 'TransferQueue', 'BlockingQueue', 'BlockingDeque',
-      'AnnotatedElement', 'GenericDeclaration', 'Type', 'TypeVariable',
-      'SerializablePermission', 'SocketOptions', 'FileNameMap',
-      'Comparator', 'Formattable', 'RandomAccess', 'NavigableMap', 'NavigableSet',
-      'SortedMap', 'SortedSet', 'Deque', 'ListIterator', 'Spliterator',
-      'PrimitiveIterator', 'OfInt', 'OfLong', 'OfDouble'
-    ]);
-
+  isSystemInterface(interfaceName: string): boolean {
     // 移除泛型部分
     const baseName = interfaceName.replace(/<[^>]+>/g, '').trim();
-    return systemInterfaces.has(baseName);
+
+    // 如果是全限定名，根据包名判断
+    if (baseName.includes('.')) {
+      const packageName = baseName.substring(0, baseName.lastIndexOf('.'));
+      return this.isSystemPackage(packageName);
+    }
+
+    // 简单名：无法确定是否为系统接口，返回false（让调用方自行处理）
+    return false;
+  }
+
+  /**
+   * 检查是否是系统接口（带文件上下文版本）
+   * 尝试通过Red Hat Java扩展获取接口的全限定名进行判断
+   * @param interfaceName 接口简单名（如 "HandlerInterceptor"）
+   * @param fileUri 当前文件的URI，用于解析接口
+   * @param fileContent 当前文件内容，用于提取import语句作为后备
+   */
+  async isSystemInterfaceWithContext(
+    interfaceName: string,
+    fileUri: vscode.Uri,
+    fileContent: string
+  ): Promise<boolean> {
+    // 移除泛型部分
+    const baseName = interfaceName.replace(/<[^>]+>/g, '').trim();
+
+    // 如果已经是全限定名，直接判断
+    if (baseName.includes('.')) {
+      return this.isSystemInterface(baseName);
+    }
+
+    // 尝试使用Red Hat Java扩展获取类型信息
+    if (this.canUseJavaLanguageServer()) {
+      try {
+        // 使用java.resolve.type命令解析类型
+        const result = await vscode.commands.executeCommand<any>(
+          'java.execute.workspaceCommand',
+          'java.resolve.type',
+          fileUri.toString(),
+          baseName
+        );
+
+        if (result && result.fullyQualifiedName) {
+          return this.isSystemInterface(result.fullyQualifiedName);
+        }
+      } catch (error) {
+        this.logger.debug(`[JavaLanguageService] 无法解析类型 ${baseName}:`, error);
+      }
+    }
+
+    // 后备：从import语句中查找
+    const importPattern = new RegExp(`import\\s+([\\w.$]+\\.${baseName});`);
+    const importMatch = fileContent.match(importPattern);
+    this.logger.info(`[JavaLanguageService] 查找import: ${baseName}, 匹配结果: ${importMatch ? importMatch[1] : '无'}`);
+    if (importMatch) {
+      const result = this.isSystemInterface(importMatch[1]);
+      this.logger.info(`[JavaLanguageService] ${importMatch[1]} 是系统接口: ${result}`);
+      return result;
+    }
+
+    // 无法确定，返回false
+    this.logger.info(`[JavaLanguageService] 无法确定 ${baseName} 是否为系统接口`);
+    return false;
+  }
+
+  /**
+   * 检查是否是系统包
+   * 系统包包括：JDK标准库、Spring框架、Jakarta EE等
+   * @param packageName 包名
+   */
+  private isSystemPackage(packageName: string): boolean {
+    const systemPrefixes = [
+      'java.',           // JDK核心
+      'javax.',          // Java扩展
+      'jakarta.',        // Jakarta EE
+      'sun.',            // Sun内部类
+      'com.sun.',        // Sun/Oracle内部类
+      'org.springframework.', // Spring框架
+      'org.apache.',     // Apache项目（如MyBatis, Tomcat等）
+      'org.hibernate.',  // Hibernate
+      'org.jboss.',      // JBoss
+      'org.eclipse.',    // Eclipse项目
+      'com.fasterxml.',  // Jackson等
+      'io.netty.',       // Netty
+      'io.micrometer.',  // Micrometer
+      'ch.qos.logback.', // Logback
+      'org.slf4j.',      // SLF4J
+      'org.junit.',      // JUnit
+      'org.mockito.',    // Mockito
+      'lombok.',         // Lombok
+      'com.google.',     // Google库（Guava等）
+      'reactor.',        // Project Reactor
+      'kotlin.',         // Kotlin标准库
+      'scala.',          // Scala标准库
+      'groovy.',         // Groovy
+    ];
+
+    return systemPrefixes.some(prefix => packageName.startsWith(prefix));
   }
 
   /**

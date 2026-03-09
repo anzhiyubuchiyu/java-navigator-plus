@@ -21,49 +21,7 @@ export class UnifiedCodeLensProvider implements vscode.CodeLensProvider {
   private _onDidChangeCodeLenses: vscode.EventEmitter<void> = new vscode.EventEmitter<void>();
   public readonly onDidChangeCodeLenses: vscode.Event<void> = this._onDidChangeCodeLenses.event;
 
-  /**
-   * 系统/框架内置接口列表
-   * 这些接口不会显示"跳转到接口"按钮
-   */
-  private readonly SYSTEM_INTERFACES = new Set([
-    // Java 核心接口
-    'Serializable', 'Comparable', 'Cloneable', 'Runnable', 'Callable',
-    'Iterable', 'Iterator', 'Collection', 'List', 'Set', 'Map', 'Queue',
-    'Enumeration', 'Observer', 'AutoCloseable', 'Closeable', 'Flushable',
-    'Readable', 'Appendable', 'CharSequence', 'Externalizable',
-    // Java 8+ 函数式接口
-    'Supplier', 'Consumer', 'Predicate', 'Function', 'BiFunction',
-    'UnaryOperator', 'BinaryOperator', 'BiConsumer', 'BiPredicate',
-    // Spring 框架接口
-    'ApplicationContextAware', 'BeanFactoryAware', 'BeanNameAware',
-    'InitializingBean', 'DisposableBean', 'FactoryBean', 'SmartFactoryBean',
-    'BeanPostProcessor', 'BeanFactoryPostProcessor', 'EnvironmentAware',
-    'ResourceLoaderAware', 'MessageSourceAware', 'ApplicationEventPublisherAware',
-    'ServletContextAware', 'ServletConfigAware', 'LoadTimeWeaverAware',
-    'ImportAware', 'Aware', 'Ordered', 'PriorityOrdered',
-    // MyBatis 接口
-    'Interceptor', 'TypeHandler', 'ResultHandler', 'RowBounds',
-    // 其他常见框架接口
-    'HttpServletRequest', 'HttpServletResponse', 'ServletRequest', 'ServletResponse',
-    'Filter', 'Servlet', 'Listener', 'SessionAware', 'RequestAware',
-    'Principal', 'GrantedAuthority', 'UserDetails', 'Authentication',
-    // JPA/Hibernate
-    'EntityListener', 'AttributeConverter', 'Specification',
-    // 通用标记接口
-    'Marker', 'Tag', 'TagSupport', 'BodyTag', 'SimpleTag',
-    // 序列化相关
-    'ObjectInputValidation', 'ObjectInputFilter',
-    // 并发相关
-    'Future', 'Delayed', 'TransferQueue', 'BlockingQueue', 'BlockingDeque',
-    // 反射相关
-    'AnnotatedElement', 'GenericDeclaration', 'Type', 'TypeVariable',
-    // 网络相关
-    'SerializablePermission', 'SocketOptions', 'FileNameMap',
-    // 工具接口
-    'Comparator', 'Formattable', 'RandomAccess', 'NavigableMap', 'NavigableSet',
-    'SortedMap', 'SortedSet', 'Deque', 'ListIterator', 'Spliterator',
-    'PrimitiveIterator', 'OfInt', 'OfLong', 'OfDouble'
-  ]);
+
 
   constructor() {
     this.cache = IndexCacheManager.getInstance();
@@ -131,7 +89,7 @@ export class UnifiedCodeLensProvider implements vscode.CodeLensProvider {
       } else {
         // 回退到文本解析
         const realInterfaces = javaInfo.interfaces.filter(i => !i.startsWith('__extends:'));
-        userInterfaces = this.filterSystemInterfaces(realInterfaces);
+        userInterfaces = await this.filterSystemInterfaces(realInterfaces, document);
       }
     }
 
@@ -325,11 +283,30 @@ export class UnifiedCodeLensProvider implements vscode.CodeLensProvider {
 
   /**
    * 过滤系统/框架内置接口
+   * 使用JavaLanguageService判断是否为系统接口
    * @param interfaces 接口名称列表
+   * @param document 当前文档，用于解析接口全限定名
    * @returns 用户自定义接口列表
    */
-  private filterSystemInterfaces(interfaces: string[]): string[] {
-    return interfaces.filter(name => !this.SYSTEM_INTERFACES.has(name));
+  private async filterSystemInterfaces(
+    interfaces: string[],
+    document: vscode.TextDocument
+  ): Promise<string[]> {
+    const content = document.getText();
+    const filtered: string[] = [];
+
+    for (const name of interfaces) {
+      const isSystem = await this.javaLanguageService.isSystemInterfaceWithContext(
+        name,
+        document.uri,
+        content
+      );
+      if (!isSystem) {
+        filtered.push(name);
+      }
+    }
+
+    return filtered;
   }
 
   private cacheHasSqlForMethod(namespace: string, methodName: string): boolean {

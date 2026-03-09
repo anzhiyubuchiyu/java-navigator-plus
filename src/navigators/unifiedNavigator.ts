@@ -182,7 +182,9 @@ export class UnifiedNavigator {
     const content = await readFileContent(classPath);
     if (!content) return [];
 
-    const interfaces = JavaParser.extractImplementedInterfaces(content);
+    // 使用异步版本提取接口，自动过滤系统接口
+    const fileUri = vscode.Uri.file(classPath);
+    const interfaces = await JavaParser.extractImplementedInterfacesAsync(content, fileUri);
     const candidates: Candidate[] = [];
 
     for (const intf of interfaces) {
