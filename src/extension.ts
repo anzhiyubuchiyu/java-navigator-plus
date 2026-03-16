@@ -35,10 +35,40 @@ const DEBOUNCE_DELAY = 300;
 
 /**
  * 扩展激活
+ * 依据 Red Hat Java 扩展的可用性决定是否启用完整功能
  */
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
   logger = Logger.getInstance();
   logger.info('Java Jump 扩展已激活');
+
+  // 检查 Red Hat Java 扩展是否可用
+  const redHatJavaExtension = vscode.extensions.getExtension('redhat.java');
+  const isRedHatJavaAvailable = !!redHatJavaExtension;
+
+  if (!isRedHatJavaAvailable) {
+    logger.info('[Java Jump] Red Hat Java 扩展未安装，功能将受限');
+    vscode.window.showInformationMessage(
+      'Java Jump: 建议安装 Red Hat Java 扩展以获得完整的 Java 导航功能',
+      '安装 Red Hat Java'
+    ).then(selection => {
+      if (selection === '安装 Red Hat Java') {
+        vscode.commands.executeCommand('vscode.open', vscode.Uri.parse('vscode:extension/redhat.java'));
+      }
+    });
+  } else {
+    // 等待 Red Hat Java 扩展激活
+    if (!redHatJavaExtension.isActive) {
+      logger.info('[Java Jump] 等待 Red Hat Java 扩展激活...');
+      try {
+        await redHatJavaExtension.activate();
+        logger.info('[Java Jump] Red Hat Java 扩展已激活');
+      } catch (error) {
+        logger.warn('[Java Jump] Red Hat Java 扩展激活失败:', error);
+      }
+    } else {
+      logger.info('[Java Jump] Red Hat Java 扩展已处于激活状态');
+    }
+  }
 
   cache = IndexCacheManager.getInstance();
   xmlParser = XmlParser.getInstance();

@@ -78,19 +78,13 @@ export class UnifiedCodeLensProvider implements vscode.CodeLensProvider {
       s.kind === vscode.SymbolKind.Class
     );
 
-    // 尝试使用 Java 语言服务获取更准确的接口信息
+    // 获取用户自定义接口列表（过滤系统接口）
     let userInterfaces: string[] = [];
     if (enableInterfaceNav && !javaInfo.isInterface && !javaInfo.isAbstract && !javaInfo.isMapper) {
-      // 优先使用 Java 语言服务
-      const typeDetails = await this.javaLanguageService.getTypeDetails(document.uri);
-      if (typeDetails && typeDetails.interfaces.length > 0) {
-        userInterfaces = typeDetails.interfaces;
-        this.logger.debug(`[CodeLens] Using Java language service for interfaces:`, userInterfaces);
-      } else {
-        // 回退到文本解析
-        const realInterfaces = javaInfo.interfaces.filter(i => !i.startsWith('__extends:'));
-        userInterfaces = await this.filterSystemInterfaces(realInterfaces, document);
-      }
+      // 从文本解析获取所有接口，然后过滤系统接口
+      const realInterfaces = javaInfo.interfaces.filter(i => !i.startsWith('__extends:'));
+      userInterfaces = await this.filterSystemInterfaces(realInterfaces, document);
+      this.logger.debug(`[CodeLens] 过滤后的用户接口:`, userInterfaces);
     }
 
     // 类级别的CodeLens

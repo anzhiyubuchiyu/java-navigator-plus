@@ -297,9 +297,9 @@ export class JavaLanguageService {
       return result;
     }
 
-    // 无法确定，返回false
-    this.logger.info(`[JavaLanguageService] 无法确定 ${baseName} 是否为系统接口`);
-    return false;
+    // 无法确定，保守策略：假设是系统接口（避免显示错误的跳转按钮）
+    this.logger.info(`[JavaLanguageService] 无法确定 ${baseName} 是否为系统接口，按系统接口处理`);
+    return true;
   }
 
   /**

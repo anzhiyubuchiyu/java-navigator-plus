@@ -202,13 +202,8 @@ export class JavaParser {
     // 匹配示例: class UserServiceImpl implements UserService
     // 匹配示例: class UserServiceImpl extends BaseService implements UserService, OtherService
     // 匹配示例: class UserServiceImpl<T> implements Service<T>
-    // 使用[\s\S]代替.来匹配包括换行符在内的所有字符
     const declMatch = content.match(/\bclass\s+([\w<>,\s]+?)(?:\s+extends\s+([\w<>,.?\s]+?))?(?:\s+implements\s+([^{\n;]+))?\s*\{/);
-    if (!declMatch) {
-      console.log('[JavaParser] 未匹配到类声明');
-      return [];
-    }
-    console.log(`[JavaParser] 类声明匹配结果: extends=${declMatch[2]}, implements=${declMatch[3]}`);
+    if (!declMatch) return [];
 
     // 解析implements子句 (declMatch[3])
     if (declMatch[3]) {
@@ -255,8 +250,6 @@ export class JavaParser {
     const javaService = JavaLanguageService.getInstance();
     const filtered: string[] = [];
 
-    console.log(`[JavaParser] 提取到接口: ${allInterfaces.join(', ')}`);
-
     for (const iface of allInterfaces) {
       // 跳过extends标记
       if (iface.startsWith('__extends:')) {
@@ -265,13 +258,11 @@ export class JavaParser {
       }
 
       const isSystem = await javaService.isSystemInterfaceWithContext(iface, fileUri, content);
-      console.log(`[JavaParser] ${iface} 是系统接口: ${isSystem}`);
       if (!isSystem) {
         filtered.push(iface);
       }
     }
 
-    console.log(`[JavaParser] 过滤后接口: ${filtered.join(', ')}`);
     return filtered;
   }
 
