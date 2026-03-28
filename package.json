@@ -2,7 +2,7 @@
   "name": "java-jump",
   "displayName": "Java Jump",
   "description": "融合Java接口实现跳转与MyBatis Mapper XML导航的统一Java导航插件",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "publisher": "anzhiyubuchiyu",
   "icon": "icon.jpg",
   "repository": {
